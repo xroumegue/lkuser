@@ -17,8 +17,8 @@ ARCH ?= arm
 # some newlib stuff
 NEWLIB_INSTALL_DIR := install-newlib
 NEWLIB_INC_DIR := $(NEWLIB_INSTALL_DIR)/arm-eabi/include
-LIBC := $(NEWLIB_INSTALL_DIR)/arm-eabi/lib/thumb/thumb2/interwork/libc.a
-LIBM := $(NEWLIB_INSTALL_DIR)/arm-eabi/lib/thumb/thumb2/interwork/libm.a
+LIBC := $(NEWLIB_INSTALL_DIR)/arm-eabi/lib/thumb/libc.a
+LIBM := $(NEWLIB_INSTALL_DIR)/arm-eabi/lib/thumb/libm.a
 
 # compiler flags
 GLOBAL_COMPILEFLAGS := -g -fno-builtin -finline -O2
