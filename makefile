@@ -14,11 +14,27 @@ BUILDDIR := build
 CCACHE ?=
 ARCH ?= arm
 
+ifeq ($(ARCH), arm)
+    TARGET := arm-eabi
+    export CORTEX_CORE := a15
+    QEMU_EXE := qemu-system-arm
+else
+ifeq ($(ARCH), arm64)
+    TARGET := aarch64-elf
+    export CORTEX_CORE := a53
+    QEMU_EXE := qemu-system-aarch64
+else
+	$(error $(ARCH) is not supported)
+endif
+endif
+
 # some newlib stuff
-NEWLIB_INSTALL_DIR := install-newlib
-NEWLIB_INC_DIR := $(NEWLIB_INSTALL_DIR)/arm-eabi/include
-LIBC := $(NEWLIB_INSTALL_DIR)/arm-eabi/lib/thumb/libc.a
-LIBM := $(NEWLIB_INSTALL_DIR)/arm-eabi/lib/thumb/libm.a
+NEWLIB_INSTALL_DIR := install-newlib-$(ARCH)
+NEWLIB_INC_DIR := $(NEWLIB_INSTALL_DIR)/$(TARGET)/include
+LIBC := $(NEWLIB_INSTALL_DIR)/$(TARGET)/lib/libc.a
+LIBM := $(NEWLIB_INSTALL_DIR)/$(TARGET)/lib/libm.a
+
+NEWLIB_BUILD_DIR := build-newlib-$(ARCH)
 
 # compiler flags
 GLOBAL_COMPILEFLAGS := -g -fno-builtin -finline -O2
@@ -62,17 +78,17 @@ clean:
 spotless: clean clean-newlib
 	$(MAKE) -f makefile.lk spotless
 
-configure-newlib build-newlib/Makefile:
-	mkdir -p build-newlib
-	cd build-newlib && ../newlib/configure --target arm-eabi --disable-newlib-supplied-syscalls --prefix=`pwd`/../install-newlib
+configure-newlib $(NEWLIB_BUILD_DIR)/Makefile:
+	mkdir -p $(NEWLIB_BUILD_DIR)
+	cd $(NEWLIB_BUILD_DIR) && ../newlib/configure --target $(TARGET) --disable-newlib-supplied-syscalls --prefix=`pwd`/../$(NEWLIB_INSTALL_DIR)
 
-build-newlib $(LIBC) $(LIBM): build-newlib/Makefile
-	mkdir -p install-newlib
-	$(MAKE) -C build-newlib
-	$(MAKE) -C build-newlib install MAKEFLAGS=
+$(NEWLIB_BUILD_DIR) $(LIBC) $(LIBM): $(NEWLIB_BUILD_DIR)/Makefile
+	mkdir -p $(NEWLIB_INSTALL_DIR)
+	$(MAKE) -C $(NEWLIB_BUILD_DIR)
+	$(MAKE) -C $(NEWLIB_BUILD_DIR) install MAKEFLAGS=
 
 clean-newlib:
-	rm -rf build-newlib install-newlib
+	rm -rf $(NEWLIB_BUILD_DIR) $(NEWLIB_INSTALL_DIR)
 
 $(BUILDDIR)/apps.fs: $(APPS)
 	@$(MKDIR)
@@ -81,8 +97,8 @@ $(BUILDDIR)/apps.fs: $(APPS)
 	$(NOECHO)cat $(APPS) | dd of=$@ conv=notrunc
 
 test: lk $(APPS) $(BUILDDIR)/apps.fs
-	qemu-system-arm -m 512 -machine virt -cpu cortex-a15 -kernel build-qemu-usertest/lk.elf -nographic -drive if=none,file=$(BUILDDIR)/apps.fs,id=blk,format=raw -device virtio-blk-device,drive=blk
+	$(QEMU_EXE) -cpu cortex-$(CORTEX_CORE) -m 512 -machine virt -kernel build-qemu-usertest/lk.elf -nographic -drive if=none,file=$(BUILDDIR)/apps.fs,id=blk,format=raw -device virtio-blk-device,drive=blk
 
-.PHONY: all _all lk clean spotless build-newlib configure-newlib clean-newlib
+.PHONY: all _all lk clean spotless $(NEWLIB_BUILD_DIR) configure-newlib clean-newlib
 
 # vim: set noexpandtab ts=4 sw=4:
