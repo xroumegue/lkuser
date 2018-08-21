@@ -72,7 +72,7 @@ typedef struct lkuser_thread {
 } lkuser_thread_t;
 
 /* defined in syscalls.c */
-const struct lkuser_syscall_table lkuser_syscalls;
+extern const struct lkuser_syscall_table lkuser_syscalls;
 
 static inline lkuser_thread_t *get_lkuser_thread(void)
 {
