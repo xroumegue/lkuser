@@ -158,6 +158,8 @@ static lkuser_thread_t *create_thread(lkuser_proc_t *p, void *entry)
     return t;
 }
 
+/* extern dump_aspace(const vmm_aspace_t *a);*/
+
 static int lkuser_start_routine(void *arg)
 {
     lkuser_thread_t *t = (lkuser_thread_t *)arg;
@@ -165,13 +167,21 @@ static int lkuser_start_routine(void *arg)
     /* set our per-thread pointer */
     __tls_set(TLS_ENTRY_LKUSER, (uintptr_t)t);
 
+    /* ELF loader */
+    status_t err = lkuser_load_bio(t->proc, "virtio0");
+    printf("lkuser_load_bio() returns %d, entry at %p\n", err, t->proc->entry);
+    t->entry = t->proc->entry;
+
+
     /* create a user stack for the new thread */
-    status_t err = vmm_alloc(t->proc->aspace, "lkuser_user_stack", PAGE_SIZE, &t->user_stack, PAGE_SIZE_SHIFT,
+    err = vmm_alloc(t->proc->aspace, "lkuser_user_stack", PAGE_SIZE, &t->user_stack, PAGE_SIZE_SHIFT,
                              0, ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_NO_EXECUTE);
     LTRACEF("vmm_alloc returns %d, stack at %p\n", err, t->user_stack);
 
     /* XXX put bits on the user stack */
+    memset(t->user_stack, 'X', PAGE_SIZE);
 
+/*    dump_aspace(t->proc->aspace); */
     /* switch to user mode and start the process */
     arch_enter_uspace((vaddr_t)t->entry,
             (uintptr_t)t->user_stack + PAGE_SIZE);
@@ -212,6 +222,8 @@ status_t lkuser_start_binary(lkuser_proc_t *p, bool wait)
     list_add_head(&p->thread_list, &t->node);
     mutex_release(&p->thread_list_lock);
 
+    /* Init the thread aspace */
+    t->thread.aspace = p->aspace;
     /* we're ready to run now */
     t->proc->state = PROC_STATE_RUNNING;
 
@@ -318,8 +330,7 @@ usage:
         printf("lkuser_load_bio() returns %d, entry at %p\n", err, proc->entry);
     } else if (!strcmp(argv[1].str, "run")) {
         if (!proc) {
-            printf("no loaded binary\n");
-            return -1;
+            proc = create_proc();
         }
 
         bool wait = true;
